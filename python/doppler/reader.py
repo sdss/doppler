@@ -384,8 +384,8 @@ def boss(filename,badval=0):
         spec.model = tab1["model"].data
         spec.meta = cat1
         # What are the units?
-        spec.snr = cat1["SN_MEDIAN_ALL"].data[0]
-        spec.observatory = 'apo'
+        spec.snr = cat1["sn_median_all"].data[0]
+        spec.observatory = 'apo'  # need to check this for SDSS-V
         spec.wavevac = True
         return spec        
 
