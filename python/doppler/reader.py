@@ -349,7 +349,11 @@ def boss(filename,badval=0):
         # HDU3 - table with line measurements
         head = fits.getheader(filename,0)
         tab1 = Table.read(filename,1)
+        for c in tab1.colnames:   # Make column names all lowercase
+            tab1[c].name=c.lower()
         cat1 = Table.read(filename,2)
+        for c in cat1.colnames:   # Make column names all lowercase
+            cat1[c].name=c.lower()
         flux = tab1["flux"].data
         wave = 10**tab1["loglam"].data
         wdisp = tab1["wdisp"].data
