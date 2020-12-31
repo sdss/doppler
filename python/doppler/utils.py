@@ -434,11 +434,14 @@ def specprep(spec):
     return spec
 
 
-def maskoutliers(spec,nsig=5,verbose=False):
+def maskoutliers(spec,nsig=5,verbose=False,logger=None):
     """
     Mask large positive outliers and negative flux pixels in the spectrum.
 
     """
+
+    if logger is None:
+        logger = dln.basiclogger()
 
     spec2 = spec.copy()
     wave = spec2.wave.copy().reshape(spec2.npix,spec2.norder)   # make 2D
@@ -475,16 +478,19 @@ def maskoutliers(spec,nsig=5,verbose=False):
     spec2.err = err
     spec2.mask = mask
     
-    if verbose is True: print('Masked '+str(totnbd)+' outlier or negative pixels')
+    if verbose is True: logger.info('Masked '+str(totnbd)+' outlier or negative pixels')
     
     return spec2
 
 
-def maskdiscrepant(spec,model,nsig=10,verbose=False):
+def maskdiscrepant(spec,model,nsig=10,verbose=False,logger=None):
     """
     Mask pixels that are discrepant when compared to a model.
 
     """
+
+    if logger is None:
+        logger = dln.basiclogger()
 
     spec2 = spec.copy()
     wave = spec2.wave.copy().reshape(spec2.npix,spec2.norder)   # make 2D
@@ -524,7 +530,7 @@ def maskdiscrepant(spec,model,nsig=10,verbose=False):
     spec2.err = err
     spec2.mask = mask
 
-    if verbose is True: print('Masked '+str(totnbd)+' discrepant pixels')
+    if verbose is True: logger.info('Masked '+str(totnbd)+' discrepant pixels')
     
     return spec2
 

@@ -1083,7 +1083,8 @@ def emcee_lnprob(theta, x, y, yerr, models, spec):
     return lp + emcee_lnlike(theta, x, y, yerr, models, spec)
 
 
-def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,1000],plot=False,usepeak=False):
+def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,1000],plot=False,
+                  usepeak=False,logger=None):
     """
     Fit spectrum using cross-correlation with models sampled in the parameter space.
     
@@ -1118,6 +1119,9 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
 
     """
     
+    if logger is None:
+        logger = dln.basiclogger()
+
     # Check that the samples input has the right columns
     if samples is not None:
         for n in ['teff','logg','feh']:
@@ -1165,7 +1169,7 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
                          ('ccpfwhm',np.float32),('vrel0',np.float32),
                          ('chisq',np.float32),('teff',np.float32),('logg',np.float32),('feh',np.float32)])
     outstr = np.zeros(len(teff),dtype=outdtype)
-    if verbose is True: print('TEFF    LOGG     FEH    VREL   CCPEAK    CCP0   CHISQ   VREL0')
+    if verbose is True: logger.info('TEFF    LOGG     FEH    VREL   CCPEAK    CCP0   CHISQ   VREL0')
     for i in range(len(samples)):
         m = models([samples['teff'][i],samples['logg'][i],samples['feh'][i]],rv=0,wave=wavelog)
         mcont = polynorm(m.flux,obs.mask)
@@ -1174,7 +1178,9 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
         #if outstr1['chisq'] > 1000:
         #    import pdb; pdb.set_trace()
         if verbose is True:
-            print('%-7.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f' % (teff[i],logg[i],feh,outstr1['vrel'][0],outstr1['ccpeak'][0],outstr1['ccp0'][0],outstr1['chisq'][0],outstr1['vrel0'][0]))
+            logger.info('%-7.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f  %5.2f' % (teff[i],logg[i],feh,outstr1['vrel'][0],
+                                                                                     outstr1['ccpeak'][0],outstr1['ccp0'][0],
+                                                                                     outstr1['chisq'][0],outstr1['vrel0'][0]))
         for n in ['xshift','vrel','vrelerr','ccpeak','ccpfwhm','chisq', 'ccp0', 'vrel0']: outstr[n][i] = outstr1[n]
         outstr['teff'][i] = teff[i]
         outstr['logg'][i] = logg[i]
@@ -1189,13 +1195,13 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
     bestmodel = models(teff=beststr['teff'],logg=beststr['logg'],feh=beststr['feh'],rv=rv)
     
     if verbose is True:
-        print('Initial RV fit:')
-        printpars([beststr['teff'],beststr['logg'],beststr['feh'],rv],[None,None,None,beststr['vrelerr']])
+        logger.info('Initial RV fit:')
+        printpars([beststr['teff'],beststr['logg'],beststr['feh'],rv],[None,None,None,beststr['vrelerr']],logger=logger)
 
     return beststr, bestmodel
 
 
-def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000]):
+def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000],logger=None):
     """
     Least Squares fitting with forward modeling of the spectrum.
     
@@ -1227,6 +1233,9 @@ def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000]):
 
     """
     
+    if logger is None:
+        logger = dln.basiclogger()
+
     # Prepare the spectrum
     #-----------------------------
     # normalize and mask spectrum
@@ -1247,7 +1256,7 @@ def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000]):
     for p in models:
         lbounds[0:3] = np.minimum(lbounds[0:3],np.min(p.ranges,axis=1))
         ubounds[0:3] = np.maximum(ubounds[0:3],np.max(p.ranges,axis=1))
-    print('fit_lsq: ', maxvel)
+    logger.info('fit_lsq: '+str(maxvel))
     lbounds[3] = maxvel[0]
     ubounds[3] = maxvel[1]
     bounds = (lbounds, ubounds)
@@ -1273,11 +1282,11 @@ def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000]):
     lsperror = np.sqrt(np.diag(lscov))
     
     if verbose is True:
-        print('Least Squares RV and stellar parameters:')
-        printpars(lspars)
+        logger.info('Least Squares RV and stellar parameters:')
+        printpars(lspars,logger=logger)
     lsmodel = models(teff=lspars[0],logg=lspars[1],feh=lspars[2],rv=lspars[3])
     lschisq = np.sqrt(np.sum(((spec.flux-lsmodel.flux)/spec.err)**2)/(spec.npix*spec.norder))
-    if verbose is True: print('chisq = %5.2f' % lschisq)
+    if verbose is True: logger.info('chisq = %5.2f' % lschisq)
 
     # Put it into the output structure
     dtype = np.dtype([('pars',float,4),('parerr',float,4),('parcov',float,(4,4)),('chisq',float)])
@@ -1676,7 +1685,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     spec.err /= spec.cont
 
     # Mask out any large positive outliers, e.g. badly subtracted sky lines
-    specm = utils.maskoutliers(spec,verbose=verbose)
+    specm = utils.maskoutliers(spec,verbose=verbose,logger=logger)
     
     # Step 2: Load and prepare the Cannon models
     #-------------------------------------------
@@ -1686,7 +1695,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
 
     # Step 3: Get initial RV using cross-correlation with rough sampling of Teff/logg parameter space
     #------------------------------------------------------------------------------------------------
-    beststr, xmodel = fit_xcorrgrid(specm,pmodels,verbose=verbose,maxvel=maxvel,plot=plot)  
+    beststr, xmodel = fit_xcorrgrid(specm,pmodels,verbose=verbose,maxvel=maxvel,plot=plot,logger=logger)  
     
     # Step 4: Get better Cannon stellar parameters using initial RV
     #--------------------------------------------------------------
@@ -1711,7 +1720,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     # Tweak the continuum normalization
     if tweak : specm = tweakcontinuum(specm,bestmodelspec0)
     # Mask out very discrepant pixels when compared to the best-fit model
-    specm = utils.maskdiscrepant(specm,bestmodelspec0,verbose=verbose)  
+    specm = utils.maskdiscrepant(specm,bestmodelspec0,verbose=verbose,logger=logger)  
     
     # Refit the Cannon
     labels, cov, meta = bestmodelinterp.test(specm)
@@ -2063,7 +2072,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     if verbose is True:
         logger.info(' ')
         logger.info('Step #3: Fitting all spectra simultaneously')
-        logger.info('initpar1: ', initpar1)
+        logger.info('initpar1: '+', '.join(initpar1.astype(str)))
     out1, fmodels1 = multifit_lsq(specmlist,modlist,initpar1,maxvel=maxvel)
     stelpars1 = out1['pars'][0,0:3]
     stelparerr1 = out1['parerr'][0,0:3]    
