@@ -970,7 +970,7 @@ def spec_resid(pars,wave,flux,err,models,spec):
     return resid
 
 
-def printpars(pars,parerr=None):
+def printpars(pars,parerr=None,logger=None):
     """ Print out the 3/4 parameters."""
 
     names = ['Teff','logg','[Fe/H]','Vrel']
@@ -981,9 +981,15 @@ def printpars(pars,parerr=None):
         else:
             err = parerr[i]
         if err is not None:
-            print('%-6s =  %8.2f +/- %6.3f %-5s' % (names[i],pars[i],err,units[i]))
+            if logger is not None:
+                logger.info('%-6s =  %8.2f +/- %6.3f %-5s' % (names[i],pars[i],err,units[i]))
+            else:
+                print('%-6s =  %8.2f +/- %6.3f %-5s' % (names[i],pars[i],err,units[i]))
         else:
-            print('%-6s =  %8.2f %-5s' % (names[i],pars[i],units[i]))
+            if logger is not None:
+                logger.info('%-6s =  %8.2f %-5s' % (names[i],pars[i],units[i]))
+            else:
+                print('%-6s =  %8.2f %-5s' % (names[i],pars[i],units[i]))
 
     
 def emcee_lnlike(theta, x, y, yerr, models, spec):
@@ -1602,7 +1608,8 @@ def multifit_lsq(speclist,modlist,initpar=None,verbose=False,maxvel=[-1000,1000]
     return out, lsmodel
 
 
-def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=None,retpmodels=False,plot=False,tweak=True,usepeak=False,maxvel=[-1000,1000]) :
+def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=None,retpmodels=False,
+        plot=False,tweak=True,usepeak=False,maxvel=[-1000,1000],logger=None):
     """
     Fit the spectrum.  Find the best RV and stellar parameters using the Cannon models.
 
@@ -1646,6 +1653,9 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
          out, model = doppler.rv.fit(spec)
 
     """
+
+    if logger is None:
+        logger = dln.basiclogger()
 
     # Turn off the Cannon's info messages
     tclogger = logging.getLogger('thecannon.utils')
@@ -1695,8 +1705,8 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     for i in range(3): labels0[i]=dln.limit(labels0[i],bestmodelinterp.ranges[i,0],bestmodelinterp.ranges[i,1])
     bestmodelspec0 = bestmodelinterp(labels0)
     if verbose is True:
-        print('Initial Cannon stellar parameters using initial RV')
-        printpars(labels0) 
+        logger.info('Initial Cannon stellar parameters using initial RV')
+        printpars(labels0,logger=logger) 
         
     # Tweak the continuum normalization
     if tweak : specm = tweakcontinuum(specm,bestmodelspec0)
@@ -1710,8 +1720,8 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     for i in range(3): labels[i]=dln.limit(labels[i],bestmodelinterp.ranges[i,0],bestmodelinterp.ranges[i,1])
     bestmodelspec = bestmodelinterp(labels)
     if verbose is True:
-        print('Initial Cannon stellar parameters using initial RV and Tweaking the normalization')
-        printpars(labels)
+        logger.info('Initial Cannon stellar parameters using initial RV and Tweaking the normalization')
+        printpars(labels,logger=logger)
     
     # Step 5: Improved RV using better Cannon template
     #-------------------------------------------------
@@ -1746,8 +1756,8 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     for i in range(3): labels2[i]=dln.limit(labels2[i],bestmodelinterp.ranges[i,0],bestmodelinterp.ranges[i,1])
     bestmodelspec2 = bestmodelinterp(labels2)
     if verbose is True:
-        print('Improved RV and Cannon stellar parameters:')
-        printpars(np.concatenate((labels2,bestrv)),[None,None,None,beststr2['vrelerr']])
+        logger.info('Improved RV and Cannon stellar parameters:')
+        printpars(np.concatenate((labels2,bestrv)),[None,None,None,beststr2['vrelerr']],logger=logger)
     
     # Step 7: Least Squares fitting with forward modeling
     #----------------------------------------------------
@@ -1780,8 +1790,8 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     finerv = vel2[bestind]
     finechisq = chisq2[bestind]
     if verbose is True:
-        print('Fine grid best RV = %5.2f km/s' % finerv)
-        print('chisq = %5.2f' % finechisq)
+        logger.info('Fine grid best RV = %5.2f km/s' % finerv)
+        logger.info('chisq = %5.2f' % finechisq)
     
     # Final parameters and uncertainties (so far)
     fpars = lspars
@@ -1805,11 +1815,11 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     bc = specm.barycorr()
     vhelio = fpars[3] + bc
     if verbose is True:
-        print('Final parameters:')
-        printpars(fpars[0:3],fperror[0:3])
-        print('Vhelio = %6.2f +/- %5.2f km/s' % (vhelio,fperror[3]))
-        print('BC = %5.2f km/s' % bc)
-        print('chisq = %5.2f' % fchisq)
+        logger.info('Final parameters:')
+        printpars(fpars[0:3],fperror[0:3],logger=logger)
+        logger.info('Vhelio = %6.2f +/- %5.2f km/s' % (vhelio,fperror[3]))
+        logger.info('BC = %5.2f km/s' % bc)
+        logger.info('chisq = %5.2f' % fchisq)
     dtype = np.dtype([('vhelio',np.float32),('vrel',np.float32),('vrelerr',np.float32),
                       ('teff',np.float32),('tefferr',np.float32),('logg',np.float32),('loggerr',np.float32),
                       ('feh',np.float32),('feherr',np.float32),('chisq',np.float32),('bc',np.float32)])
@@ -1839,7 +1849,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
         specfigure(figfile,specm,fmodel,out,original=orig,verbose=verbose)
 
     # How long did this take
-    if verbose is True: print('dt = %5.2f sec.' % (time.time()-t0))
+    if verbose is True: logger.info('dt = %5.2f sec.' % (time.time()-t0))
    
     del spec, wavelog, lsmodel, m
 
@@ -1851,9 +1861,13 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
 
     
 
-def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=False,outdir=None,plot=False,tweak=True,maxlag=400,maxvel=[-500,500],usepeak=True) :
+def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=False,outdir=None,
+             plot=False,tweak=True,maxlag=400,maxvel=[-500,500],usepeak=True,logger=None):
     """This fits a Cannon model to multiple spectra of the same star."""
     # speclist is list of Spec1D objects.
+
+    if logger is None:
+        logger = dln.basiclogger()
 
     nspec = len(speclist)
     t0 = time.time()
@@ -1886,18 +1900,18 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         snr = np.flip(np.sort(info['snr']))
         snrcut = snr[np.maximum(np.int(np.ceil(0.25*nspec)),np.minimum(4,nspec-1))]
         if verbose is True:
-            print('Lowering S/N cut to %5.1f so at least 25%% of the spectra pass the cut' % snrcut)
+            logger.info('Lowering S/N cut to %5.1f so at least 25%% of the spectra pass the cut' % snrcut)
         
     # Step 1) Loop through each spectrum and run fit()
-    if verbose is True: print('Step #1: Fitting the individual spectra')
+    if verbose is True: logger.info('Step #1: Fitting the individual spectra')
     specmlist = []
     modlist = []
     bdlist = []
     for i in range(len(speclist)):
         spec = speclist[i].copy()
         if verbose is True:
-            print('Fitting spectrum '+str(i+1))
-            print(speclist[i].filename)
+            logger.info('Fitting spectrum '+str(i+1))
+            logger.info(speclist[i].filename)
         # Only do this for spectra with S/N>10 or 15
         if spec.snr>snrcut:
             # Save the plot, figure the output figure filename
@@ -1913,8 +1927,8 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
                     fit(spec,verbose=verbose,mcmc=mcmc,figfile=figfile,retpmodels=True,
                         plot=plot,tweak=tweak,usepeak=usepeak,maxvel=maxvel)
             except RuntimeError as err :
-                print('Exception raised for: ', speclist[i].filename)
-                print("Runtime error: {0}".format(err))
+                logger.info('Exception raised for: ', speclist[i].filename)
+                logger.info("Runtime error: {0}".format(err))
                 # if we had a failure in fit, treat it as lower S/N object and see if
                 #  we can fit it in the multifit_lsq step
                 #print('removing from list ....')
@@ -1952,7 +1966,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
             del model
         else:
             if verbose is True:
-                print('Skipping: S/N=%6.1f below threshold of %6.1f.  Loading spectrum and preparing models.' % (spec.snr,snrcut))
+                logger.info('Skipping: S/N=%6.1f below threshold of %6.1f.  Loading spectrum and preparing models.' % (spec.snr,snrcut))
             modlist.append(cannon.models.prepare(speclist[i]).copy())
             sp = speclist[i].copy()
             sp.normalized = True
@@ -1965,7 +1979,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
             specmlist.append(sp)
             # at least need BC
             info['bc'][i] = speclist[i].barycorr()
-        if verbose is True: print(' ')
+        if verbose is True: logger.info(' ')
 
     # remove failed frames from list
     info = np.delete(info,bdlist)
@@ -2001,7 +2015,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
 
         
     # Step 2) find weighted stellar parameters
-    if verbose is True: print('Step #2: Getting weighted stellar parameters')
+    if verbose is True: logger.info('Step #2: Getting weighted stellar parameters')
     gd, ngd = dln.where(np.isfinite(info['chisq']))
     if ngd>0:
         pars = ['teff','logg','feh','vhelio']
@@ -2022,8 +2036,8 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
             # weighted by S/N
             wtpars[i] = dln.wtmean(p,info['snr'][gd])
         if verbose is True:
-            print('Initial weighted parameters are:')
-            printpars(wtpars)
+            logger.info('Initial weighted parameters are:')
+            printpars(wtpars,logger=logger)
     else:
         wtpars = np.zeros(4,float)
         wtpars[0] = 6000.0
@@ -2032,8 +2046,8 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         wtpars[3] = 0.0
         vscatter0 = 999999.
         if verbose is True:
-            print('No good fits.  Using these as intial guesses:')
-            printpars(wtpars)
+            logger.info('No good fits.  Using these as intial guesses:')
+            printpars(wtpars,logger=logger)
         
     # Make initial guesses for all the parameters, 3 stellar parameters and Nspec relative RVs
     initpar1 = np.zeros(3+nspec,float)
@@ -2047,9 +2061,9 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
 
     # Step 3) refit all spectra simultaneous fitting stellar parameters and RVs
     if verbose is True:
-        print(' ')
-        print('Step #3: Fitting all spectra simultaneously')
-        print('initpar1: ', initpar1)
+        logger.info(' ')
+        logger.info('Step #3: Fitting all spectra simultaneously')
+        logger.info('initpar1: ', initpar1)
     out1, fmodels1 = multifit_lsq(specmlist,modlist,initpar1,maxvel=maxvel)
     stelpars1 = out1['pars'][0,0:3]
     stelparerr1 = out1['parerr'][0,0:3]    
@@ -2060,16 +2074,16 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     vscatter1 = dln.mad(vhelio1)
     verr1 = vscatter1/np.sqrt(nspec)
     if verbose is True:
-        print('Parameters:')
-        printpars(stelpars1)
-        print('Vhelio = %6.2f +/- %5.2f km/s' % (medvhelio1,verr1))
-        print('Vscatter =  %6.3f km/s' % vscatter1)
-        print(vhelio1)
+        logger.info('Parameters:')
+        printpars(stelpars1,logger=logger)
+        logger.info('Vhelio = %6.2f +/- %5.2f km/s' % (medvhelio1,verr1))
+        logger.info('Vscatter =  %6.3f km/s' % vscatter1)
+        logger.info(vhelio1)
 
     # Step 4) tweak continua and remove outlies
     if verbose is True:
-        print(' ')
-        print('Step #4: Tweaking continuum and masking outliers')
+        logger.info(' ')
+        logger.info('Step #4: Tweaking continuum and masking outliers')
     for i,spm in enumerate(specmlist):
         bestm = modlist[i](stelpars1,rv=vrel1[i])
         if bestm is None:
@@ -2087,8 +2101,8 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
 
     # Step 5) refit all spectra simultaneous fitting stellar parameters and RVs
     if verbose is True:
-        print(' ')
-        print('Step #5: Re-fitting all spectra simultaneously')
+        logger.info(' ')
+        logger.info('Step #5: Re-fitting all spectra simultaneously')
 
     # Initial guesses for all the parameters, 3 stellar paramters and Nspec relative RVs
     initpar2 = out1['pars'][0]
@@ -2104,11 +2118,11 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     vscatter2 = vhelio2.std(ddof=1)
     verr2 = vscatter2/np.sqrt(nspec)
     if verbose is True:
-        print('Final parameters:')
-        printpars(stelpars2)
-        print('Vhelio = %6.2f +/- %5.2f km/s' % (medvhelio2,verr2))
-        print('Vscatter =  %6.3f km/s' % vscatter2)
-        print(vhelio2)
+        logger.info('Final parameters:')
+        printpars(stelpars2,logger=logger)
+        logger.info('Vhelio = %6.2f +/- %5.2f km/s' % (medvhelio2,verr2))
+        logger.info('Vscatter =  %6.3f km/s' % vscatter2)
+        logger.info(vhelio2)
    
     # Final output structure
     final = info.copy()
@@ -2168,7 +2182,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     sumstr['chisq'] = totchisq
         
     # How long did this take
-    if verbose is True: print('dt = %5.2f sec.' % (time.time()-t0))
+    if verbose is True: logger.info('dt = %5.2f sec.' % (time.time()-t0))
     
     return sumstr, final, bmodel, specmlist, time.time()-t0
 
