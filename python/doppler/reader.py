@@ -270,7 +270,7 @@ def apstar(filename,badval=20735):
         flux = fits.getdata(filename,1).T * 1e-17
         npix,nord = flux.shape
         lsfcoef = fits.getdata(filename,8).T
-        wave2 = np.tile(wave,nord).reshape(npix,nord)   # make wave 2D
+        wave2 = np.tile(wave,nord).reshape(nord,npix).T   # make wave 2D
         spec = Spec1D(flux,wave=wave2,lsfpars=lsfcoef,lsftype='Gauss-Hermite',lsfxtype='Pixels')
         spec.filename = filename
         spec.sptype = "apStar"
