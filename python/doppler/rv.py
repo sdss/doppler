@@ -1766,7 +1766,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     bestmodelspec2 = bestmodelinterp(labels2)
     if verbose is True:
         logger.info('Improved RV and Cannon stellar parameters:')
-        printpars(np.concatenate((labels2,bestrv)),[None,None,None,beststr2['vrelerr']],logger=logger)
+        printpars(np.hstack((labels2,bestrv)),[None,None,None,beststr2['vrelerr']],logger=logger)
     
     # Step 7: Least Squares fitting with forward modeling
     #----------------------------------------------------

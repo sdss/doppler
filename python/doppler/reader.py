@@ -268,8 +268,10 @@ def apstar(filename,badval=20735):
         
         # flux, err, sky, skyerr are in units of 1e-17
         flux = fits.getdata(filename,1).T * 1e-17
+        npix,nord = flux.shape
         lsfcoef = fits.getdata(filename,8).T
-        spec = Spec1D(flux,wave=wave,lsfpars=lsfcoef,lsftype='Gauss-Hermite',lsfxtype='Pixels')
+        wave2 = np.tile(wave,nord).reshape(npix,nord)   # make wave 2D
+        spec = Spec1D(flux,wave=wave2,lsfpars=lsfcoef,lsftype='Gauss-Hermite',lsfxtype='Pixels')
         spec.filename = filename
         spec.sptype = "apStar"
         spec.waveregime = "NIR"
@@ -346,7 +348,7 @@ def boss(filename,badval=0):
     base, ext = os.path.splitext(os.path.basename(filename))
     
     # BOSS spec
-    if (base.find("spec-") > -1) | (base.find("SDSS") > -1):
+    if (base.lower().find("spec-") > -1) | (base.lower().find("sdss") > -1):
         # HDU1 - binary table of spectral data
         # HDU2 - table with metadata including S/N
         # HDU3 - table with line measurements
@@ -384,10 +386,12 @@ def boss(filename,badval=0):
         spec.and_mask = tab1["and_mask"].data
         spec.or_mask = tab1["or_mask"].data
         spec.sky = tab1["sky"].data
-        spec.model = tab1["model"].data
+        if 'model' in np.char.array(tab1.colnames).lower():
+            spec.model = tab1["model"].data
         spec.meta = cat1
         # What are the units?
-        spec.snr = cat1["sn_median_all"].data[0]
+        if 'sn_median_all' in np.char.array(tab1.colnames).lower():
+            spec.snr = cat1["sn_median_all"].data[0]
         spec.observatory = 'apo'  # need to check this for SDSS-V
         spec.wavevac = True
         return spec        
