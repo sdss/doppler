@@ -279,7 +279,7 @@ def apstar(filename,badval=20735):
         #bad = (spec.err<=0)   # fix bad error values
         #if np.sum(bad) > 0:
         #    spec.err[bad] = 1e30
-        spec.bitmask = fits.getdata(filename,3)
+        spec.bitmask = fits.getdata(filename,3).T
         spec.sky = fits.getdata(filename,4).T * 1e-17
         spec.skyerr = fits.getdata(filename,5).T * 1e-17
         spec.telluric = fits.getdata(filename,6).T
@@ -292,21 +292,24 @@ def apstar(filename,badval=20735):
         #   badflag = [1,1,1,1,1,1,1,1,
         #              0,0,0,0,0,0,1,0]
         mask = (np.bitwise_and(spec.bitmask,badval)!=0) | (np.isfinite(spec.flux)==False)
+        spec.mask = mask
         # Extra masking for bright skylines
+        npix,nspec = flux.shape
         x = np.arange(spec.npix)
         nsky = 4
-        medsky = median_filter(spec.sky,201,mode='reflect')
-        medcoef = dln.poly_fit(x,medsky/np.median(medsky),2)
-        medsky2 = dln.poly(x,medcoef)*np.median(medsky)
-        skymask1 = (sky>nsky*medsky2)    # pixels Nsig above median sky
-        mask[:,i] = np.logical_or(mask[:,i],skymask1)    # OR combine
-        spec.mask = mask
+        #for i in range(nspec):
+        #    medsky = median_filter(spec.sky[:,i],201,mode='reflect')
+        #    medcoef = dln.poly_fit(x,medsky/np.median(medsky),2)
+        #    medsky2 = dln.poly(x,medcoef)*np.median(medsky)
+        #    skymask1 = (sky>nsky*medsky2)    # pixels Nsig above median sky
+        #    spec.mask[:,i] = np.logical_or(spec.mask[:,i],skymask1)    # OR combine
         # Fix NaN or bad pixels pixels
-        bd,nbd = dln.where( (np.isfinite(spec.flux[:,i])==False) | (spec.err[:,i] <= 0.0) )
-        if nbd>0:
-            spec.flux[bd] = 0.0
-            spec.err[bd] = 1e30
-            spec.mask[bd] = True
+        for i in range(nspec):
+            bd,nbd = dln.where( (np.isfinite(spec.flux[:,i])==False) | (spec.err[:,i] <= 0.0) )
+            if nbd>0:
+                spec.flux[bd,i] = 0.0
+                spec.err[bd,i] = 1e30
+                spec.mask[bd,i] = True
         if nhdu>=9:
             spec.meta = fits.getdata(filename,9)    # meta-data
         spec.snr = spec.head["SNR"]
