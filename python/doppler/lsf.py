@@ -980,9 +980,10 @@ class GaussianLsf(Lsf):
             _sigma = self._sigma.reshape(self.npix,self.norder)   # make 2D
             for o in range(self.norder):
                 sig = _sigma[:,o]
-                smsig = dln.gsmooth(sig,smlen)
-                bd,nbd = dln.where(sig <= 0)
+                gd,ngd,bd,nbd = dln.where(sig > 0.001,comp=True)
                 if nbd>0:
+                    sig[bd] = np.nan
+                    smsig = dln.gsmooth(sig,smlen)
                     sig[bd] = smsig[bd]
                 if self.ndim==2:
                     self._sigma[:,o] = sig
