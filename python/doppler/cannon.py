@@ -266,7 +266,7 @@ class DopplerCannonModel(object):
             self._data = [model]     # make it a list so it is iterable
         self.prepared = False
         self.flattened = False
-
+        
     @property
     def has_continuum(self):
         if hasattr(self._data[0],'continuum'):
@@ -364,8 +364,9 @@ class DopplerCannonModel(object):
         mspec.teff = labels[0]
         mspec.logg = labels[1]
         mspec.feh = labels[2]
-        #mspec.rv = rv
         mspec.snr = np.inf
+        #for i in range(len(self.labels)):
+        #    setattr(mspec,self.labels[i],labels[i])
         
         return mspec
 

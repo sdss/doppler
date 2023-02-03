@@ -10,7 +10,7 @@ __authors__ = 'David Nidever <dnidever@noao.edu>'
 __version__ = '20190622'  # yyyymmdd                                                                                                                           
 
 import os
-#import sys, traceback
+import sys, traceback
 import contextlib, io, sys
 import numpy as np
 import warnings
@@ -1931,13 +1931,13 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
                 if outdir is not None: figfile = outdir+'/'+figfile
                 if (outdir is None) & (fdir != ''): figfile = fdir+'/'+figfile
             # Fit the spectrum    
-            try :
+            try:
                 out, model, specm, pmodels = \
                     fit(spec,verbose=verbose,mcmc=mcmc,figfile=figfile,retpmodels=True,
                         plot=plot,tweak=tweak,usepeak=usepeak,maxvel=maxvel)
-            except RuntimeError as err :
-                logger.info('Exception raised for: ', speclist[i].filename)
-                logger.info("Runtime error: {0}".format(err))
+            except:
+                logger.info('Exception raised for: '+str(speclist[i].filename))
+                traceback.print_exc()
                 # if we had a failure in fit, treat it as lower S/N object and see if
                 #  we can fit it in the multifit_lsq step
                 #print('removing from list ....')
