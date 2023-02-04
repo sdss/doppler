@@ -1994,7 +1994,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     info = np.delete(info,bdlist)
     nspec -= len(bdlist)
 
-    if len(speclist) == 1 :
+    if len(speclist) == 1:
         # if we only have one image, we are done, create summary structure and return
         sumstr['medsnr'] = info['snr'][0]
         sumstr['totsnr'] = info['snr'][0]
@@ -2132,7 +2132,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         logger.info('Vhelio = %6.2f +/- %5.2f km/s' % (medvhelio2,verr2))
         logger.info('Vscatter =  %6.3f km/s' % vscatter2)
         logger.info(vhelio2)
-   
+        
     # Final output structure
     final = info.copy()
     final['teff'] = stelpars2[0]
@@ -2159,23 +2159,26 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         totnpix += sp.npix*sp.norder
         final['chisq'][i] = chisq
         bmodel.append(m)
-
-        # final cross-correlation
-        outstr = final_xcorr(sp,modlist[i],pars1,vr1,maxvel=maxvel,plot=plot)
-        if usepeak : rv=outstr['vrel0']
-        else : rv=outstr['vrel']
-        if plot : pdb.set_trace()
-        #final['x_ccf'][i] = (np.arange(nlag)-maxlag)*(np.log(m.wave[1,0])-np.log(m.wave[0,0]))*3.e5+vr1
-        nlag = len(outstr['ccf'][0])
-        final['x_ccf'][i][0:nlag] = outstr['ccvlag']
-        final['ccf'][i][0:nlag] = outstr['ccf']
-        final['ccferr'][i][0:nlag] = outstr['ccferr']
-        final['xcorr_vrel'][i] = rv+vr1
-        final['xcorr_vrelerr'][i] = outstr['vrelerr']
-        final['xcorr_vhelio'][i] = rv+vr1+info['bc'][i]
-
-    totchisq = np.sqrt(totchisq/totnpix)
         
+        # Final cross-correlation
+        try:
+            outstr = final_xcorr(sp,modlist[i],pars1,vr1,maxvel=maxvel,plot=plot)
+            if usepeak : rv=outstr['vrel0']
+            else : rv=outstr['vrel']
+            if plot : pdb.set_trace()
+            #final['x_ccf'][i] = (np.arange(nlag)-maxlag)*(np.log(m.wave[1,0])-np.log(m.wave[0,0]))*3.e5+vr1
+            nlag = len(outstr['ccf'][0])
+            final['x_ccf'][i][0:nlag] = outstr['ccvlag']
+            final['ccf'][i][0:nlag] = outstr['ccf']
+            final['ccferr'][i][0:nlag] = outstr['ccferr']
+            final['xcorr_vrel'][i] = rv+vr1
+            final['xcorr_vrelerr'][i] = outstr['vrelerr']
+            final['xcorr_vhelio'][i] = rv+vr1+info['bc'][i]
+        except:
+            if verbose: logger.info('Final cross-correlation failed for Spectrum {:d}'.format(i+1))
+            
+    totchisq = np.sqrt(totchisq/totnpix)
+    
     # Average values
     sumstr['medsnr'] = np.median(info['snr'])
     sumstr['totsnr'] = np.sqrt(np.sum(info['snr']**2))
