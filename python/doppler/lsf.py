@@ -976,7 +976,7 @@ class GaussianLsf(Lsf):
         """ Clean up bad input Gaussian sigma values."""
         if self._sigma is not None:
             smlen = np.round(self.npix // 50).astype(int)
-            if smlen==0: smlen=3
+            if smlen==0: smlen=50
             _sigma = self._sigma.reshape(self.npix,self.norder)   # make 2D
             for o in range(self.norder):
                 sig = _sigma[:,o]
@@ -985,11 +985,19 @@ class GaussianLsf(Lsf):
                     sig[bd] = np.nan
                     smsig = dln.gsmooth(sig,smlen)
                     sig[bd] = smsig[bd]
+                gd,ngd,bd,nbd = dln.where(sig > 0.001,comp=True)
+                if nbd>0:
+                    sig[bd] = np.nan
+                    smsig = dln.gsmooth(sig,3*smlen)
+                    sig[bd] = smsig[bd]
+                gd,ngd,bd,nbd = dln.where(sig > 0.001,comp=True)
+                if nbd>0:
+                    sig[bd] = np.median(sig[gd])
                 if self.ndim==2:
                     self._sigma[:,o] = sig
                 else:
                     self._sigma = sig
-
+            
                     
     # Return full LSF values for the spectrum
     def array(self,order=None):

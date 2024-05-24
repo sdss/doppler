@@ -194,7 +194,7 @@ def apvisit(filename,badval=20735):
                 spec.flux[bd,i] = 0.0
                 spec.err[bd,i] = 1e30
                 spec.mask[bd,i] = True
-        if (nhdu>=11):
+        if (nhdu>11):
             spec.meta = fits.getdata(filename,11)   # catalog of RV and other meta-data
         # Spectrum, error, sky, skyerr are in units of 1e-17
         spec.snr = spec.head["SNR"]
@@ -380,6 +380,9 @@ def boss(filename,badval=0):
         spec.sptype = "spec"
         spec.waveregime = "Optical"
         spec.instrument = "BOSS"
+        if head.get('DATE-OBS') is None:
+            if head.get('INTSTART') is not None:
+                head['DATE-OBS'] = head['INTSTART']        
         spec.head = head
         spec.ivar = tab1["ivar"].data
         spec.bitmask = tab1["or_mask"].data
