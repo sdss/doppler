@@ -21,12 +21,13 @@ from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation
 from astropy.wcs import WCS
 from scipy.ndimage.filters import median_filter,gaussian_filter1d
-from scipy.optimize import curve_fit, least_squares
+#from scipy.optimize import curve_fit, least_squares
 from scipy.interpolate import interp1d
 import thecannon as tc
 from dlnpyutils import utils as dln, bindata
 from .spec1d import Spec1D
 from . import (cannon,utils,reader)
+from .utils import curve_fit_like as curve_fit
 import copy
 import emcee
 import corner
@@ -1280,7 +1281,7 @@ def fit_lsq(spec,models=None,initpar=None,verbose=False,maxvel=[-1000,1000],logg
     # If it hits a boundary then the solution won't change much compared to initpar
     # setting absolute_sigma=True gives crazy low lsperror values
     lsperror = np.sqrt(np.diag(lscov))
-    
+
     if verbose is True:
         logger.info('Least Squares RV and stellar parameters:')
         printpars(lspars,logger=logger)
@@ -1546,7 +1547,6 @@ def multifit_lsq(speclist,modlist,initpar=None,verbose=False,maxvel=[-1000,1000]
             cnt += npx
         
         return jac
-
         
     # We are fitting 3 stellar parameters and Nspec relative RVs
 
@@ -1597,7 +1597,7 @@ def multifit_lsq(speclist,modlist,initpar=None,verbose=False,maxvel=[-1000,1000]
     # If it hits a boundary then the solution won't chance much compared to initpar
     # setting absolute_sigma=True gives crazy low lsperror values
     lsperror = np.sqrt(np.diag(lscov))
-
+            
     if verbose is True:
         print('Least Squares RV and stellar parameters:')
         printpars(lspars)

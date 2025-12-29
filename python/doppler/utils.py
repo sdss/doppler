@@ -16,6 +16,7 @@ from scipy import sparse
 from scipy.interpolate import interp1d
 from dlnpyutils import utils as dln
 import matplotlib.pyplot as plt
+from scipy.optimize import least_squares
 
 # Ignore these warnings, it's a bug
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -592,3 +593,128 @@ def plotspec(spec,spec2=None,model=None,figsize=10):
             yr = [np.max([yr[0],-0.2]), np.min([yr[1],2.0])]
             ax[i].set_xlim(xr)
             ax[i].set_ylim(yr)
+
+def curve_fit_like(f, xdata, ydata, p0=None, sigma=None, absolute_sigma=False,
+                   bounds=(-np.inf, np.inf),
+                   jac=None,
+                   method=None,          # keep for compatibility; we'll select based on bounds
+                   maxfev=10000,
+                   ftol=1e-8,
+                   xtol=1e-8,
+                   gtol=1e-8,
+                   diff_step=None,
+                   raise_on_fail=True):
+    """
+    A curve_fit-like wrapper using scipy.optimize.least_squares.
+
+    Returns (popt, pcov) similar to scipy.optimize.curve_fit.
+
+    Key difference:
+      - If raise_on_fail=False, it will NOT raise when it hits maxfev etc.
+        and will return the best-so-far parameters (res.x).
+    """
+    x = np.asarray(xdata)
+    y = np.asarray(ydata)
+
+    # p0 handling: curve_fit can infer from f signature if p0 is None,
+    # but that's extra work; easiest is to require p0 in your codebase.
+    if p0 is None:
+        raise ValueError("p0 must be provided for curve_fit_like (unlike curve_fit).")
+    p0 = np.asarray(p0, dtype=float)
+
+    # sigma -> weighting. curve_fit uses residuals / sigma when sigma is provided.
+    if sigma is None:
+        w = None
+    else:
+        s = np.asarray(sigma, dtype=float)
+        # allow scalar or vector
+        if s.ndim == 0:
+            if s <= 0:
+                raise ValueError("sigma must be positive.")
+            w = 1.0 / s
+        else:
+            if s.shape != y.shape:
+                raise ValueError(f"sigma shape {s.shape} does not match ydata shape {y.shape}.")
+            if np.any(s <= 0) or not np.all(np.isfinite(s)):
+                raise ValueError("sigma must be finite and > 0.")
+            w = 1.0 / s
+
+    # Choose method like SciPy does: if bounds are finite, use 'trf' (or 'dogbox').
+    lb, ub = bounds
+    lb = np.asarray(lb, dtype=float) if np.iterable(lb) else float(lb)
+    ub = np.asarray(ub, dtype=float) if np.iterable(ub) else float(ub)
+    use_bounds = np.any(np.isfinite(lb)) or np.any(np.isfinite(ub))
+    if method is None:
+        method = "trf" if use_bounds else "lm"  # lm doesn't support bounds
+
+    # Residuals
+    def fun(p):
+        r = f(x, *p) - y
+        if w is None:
+            return np.ravel(r)
+        return np.ravel(r) * w
+
+    # Jacobian handling
+    # curve_fit jac: can be callable returning dy/dp (shape ndata x npar) or string.
+    # least_squares expects d(residuals)/dp with same shape.
+    if jac is None:
+        jac_ls = "2-point"  # reasonable default finite diff
+    elif isinstance(jac, str):
+        jac_ls = jac  # e.g. '2-point', '3-point', 'cs'
+    else:
+        def jac_ls(p):
+            J = jac(x, *p)  # dy/dp
+            J = np.asarray(J, dtype=float)
+            if w is None:
+                return J
+            # multiply each row by weight
+            if np.ndim(w) == 0:
+                return J * w
+            return J * w[:, None]
+
+    # Run optimizer
+    res = least_squares(
+        fun,
+        x0=p0,
+        jac=jac_ls,
+        bounds=bounds,
+        method=method,
+        max_nfev=maxfev,
+        ftol=ftol,
+        xtol=xtol,
+        gtol=gtol,
+        diff_step=diff_step,
+    )
+
+    popt = res.x
+
+    # Raise like curve_fit if desired
+    if raise_on_fail and not res.success:
+        raise RuntimeError(f"Optimal parameters not found: {res.message}")
+
+    # Covariance estimate (curve_fit behavior)
+    # pcov = inv(J^T J) * s_sq, with s_sq depending on absolute_sigma.
+    pcov = np.full((popt.size, popt.size), np.nan, dtype=float)
+    if res.jac is not None:
+        J = np.asarray(res.jac, dtype=float)
+        m, n = J.shape
+        if m > n:
+            # robust inverse using SVD (more stable than inv(JTJ))
+            try:
+                U, svals, VT = np.linalg.svd(J, full_matrices=False)
+                # threshold small singular values
+                eps = np.finfo(float).eps
+                thresh = eps * max(J.shape) * svals[0] if svals.size else 0.0
+                s_inv = np.array([1.0/si if si > thresh else 0.0 for si in svals])
+                JTJ_inv = (VT.T * (s_inv**2)) @ VT
+                if absolute_sigma:
+                    s_sq = 1.0
+                else:
+                    # res.cost = 0.5 * sum(resid^2)
+                    dof = max(1, m - n)
+                    s_sq = 2.0 * res.cost / dof
+                pcov = JTJ_inv * s_sq
+            except np.linalg.LinAlgError:
+                pass
+
+    return popt, pcov
