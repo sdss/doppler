@@ -1188,8 +1188,23 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
         outstr['feh'][i] = feh
     if plot : pdb.set_trace()
     # Get best fit
-    bestind = np.argmin(outstr['chisq'])    
-    bestind = np.argmax(outstr['ccp0'])    
+    bestind_chisq = np.argmin(outstr['chisq'])    
+    bestind = np.argmax(outstr['ccp0'])
+
+    # Deal with CCP/chisq disagreements
+    # 1) the CCP-best RV is suspicious: huge RV, near search boundary, poor fit, known bad range
+    # 2) the chisq-best solution has an acceptable CCF peak/significance
+    # 3) the chisq improvement is large enough to be hard to ignore
+    # 4) the chisq-best RV is plausibe
+    if ((bestind != bestind_chisq) and (np.abs(outstr['vrel'][bestind]) > 900) and
+        (np.abs(outstr['vrel'][bestind_chisq]) < 900)):
+        chisq_ccp = outstr['chisq'][bestind]
+        chisq_best = outstr['chisq'][bestind_chisq]
+        delta_chisq = (chisq_ccp-chisq_best)/chisq_ccp
+        if delta_chisq > 0.05:
+            logger.info('Disagreement between best-CCP and best-chisq with best-CCP RV very high. Using best-chisq')
+            bestind = bestind_chisq
+        
     beststr = outstr[bestind]
     if usepeak : rv=beststr['vrel0']
     else : rv=beststr['vrel']
@@ -1198,7 +1213,7 @@ def fit_xcorrgrid(spec,models=None,samples=None,verbose=False,maxvel=[-1000.,100
     if verbose is True:
         logger.info('Initial RV fit:')
         printpars([beststr['teff'],beststr['logg'],beststr['feh'],rv],[None,None,None,beststr['vrelerr']],logger=logger)
-
+        
     return beststr, bestmodel
 
 
