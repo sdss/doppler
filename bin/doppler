@@ -155,7 +155,7 @@ if __name__ == "__main__":
           
             # Append to the list
             speclist.append(spec)
-    
+            
         # Run Doppler jointfit()
         if verbose is True: print('')
         sumstr, final, model, specmlist = doppler.jointfit(speclist,mcmc=mcmc,saveplot=saveplot,snrcut=snrcut,verbose=verbose,outdir=outdir)

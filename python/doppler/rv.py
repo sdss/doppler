@@ -749,7 +749,6 @@ def specxcorr(wave=None,tempspec=None,obsspec=None,obserr=None,maxlag=[-200,200]
         ax[1].plot(lag*tmp,ccf_diff)
         ax[1].plot(lag[lo3:hi3]*tmp,yfit3)
         plt.draw()
-        
     
     return outstr
 
@@ -1506,7 +1505,7 @@ def multifit_lsq(speclist,modlist,initpar=None,verbose=False,maxvel=[-1000,1000]
         return flux
 
     def multispec_interp_jac(x,*argv):
-        """ Computie the Jacobian matrix (an m-by-n matrix, where element (i, j)
+        """ Compute the Jacobian matrix (an m-by-n matrix, where element (i, j)
             is the partial derivative of f[i] with respect to x[j]). """
         # We only have to recompute the full model if teff/logg/feh are being modified
         # otherwise we just modify one spectrum's model
@@ -1604,7 +1603,9 @@ def multifit_lsq(speclist,modlist,initpar=None,verbose=False,maxvel=[-1000,1000]
         cnt += npx
 
     # Fix bad error values
-    bd, = np.where((np.isfinite(err)==False) | (err <= 0.0))
+    #bd, = np.where((np.isfinite(err)==False) | (err <= 0.0))
+    medflux = np.nanmedian(flux)
+    bd, = np.where((np.isfinite(err)==False) | (err <= medflux*1e-4))
     if len(bd)>0:
         err[bd] = 1e30
         
@@ -1703,7 +1704,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     spec.cont = polynorm(spec.flux,spec.mask)
     spec.flux /= spec.cont
     spec.err /= spec.cont
-
+    
     # Mask out any large positive outliers, e.g. badly subtracted sky lines
     specm = utils.maskoutliers(spec,verbose=verbose,logger=logger)
     
@@ -1751,7 +1752,7 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     if verbose is True:
         logger.info('Initial Cannon stellar parameters using initial RV and Tweaking the normalization')
         printpars(labels,logger=logger)
-    
+        
     # Step 5: Improved RV using better Cannon template
     #-------------------------------------------------
     wavelog = utils.make_logwave_scale(specm.wave,vel=0.0)  # get new wavelength solution
@@ -1772,7 +1773,6 @@ def fit(spectrum,models=None,verbose=False,mcmc=False,figfile=None,cornername=No
     beststr2['feh'] = labels[2]
     if usepeak : bestrv = beststr2['vrel0']
     else : bestrv = beststr['vrel']
-
     
     # Step 6: Improved Cannon stellar parameters
     #-------------------------------------------
@@ -1976,6 +1976,14 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
                 info['bc'][i] = speclist[i].barycorr()
                 continue
 
+            # Mask any pixels with super lower uncertainties
+            #   these are normalized fluxes
+            bad = ((specm.mask==False) & (specm.err < 1e-4))
+            if np.sum(bad)>0:
+                logger.info('Masking '+str(np.sum(bad))+' pixels with super low flux uncertainties')
+                specm.err[bad] = 1e30
+                specm.mask[bad] = True
+            
             modlist.append(pmodels.copy())
             del pmodels
             specmlist.append(specm.copy())
@@ -2009,7 +2017,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
             # at least need BC
             info['bc'][i] = speclist[i].barycorr()
         if verbose is True: logger.info(' ')
-
+        
     # remove failed frames from list
     info = np.delete(info,bdlist)
     nspec -= len(bdlist)
@@ -2212,7 +2220,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     sumstr['feh'] = stelpars2[2]
     sumstr['feherr'] = stelparerr2[2]
     sumstr['chisq'] = totchisq
-        
+    
     # How long did this take
     if verbose is True: logger.info('dt = %5.2f sec.' % (time.time()-t0))
     
@@ -2248,9 +2256,14 @@ def polynorm(flux,mask,order=4) :
             if len(gd) > order :
                 coef = np.polyfit(x[gd],flux[gd,iorder],order)
                 cont[:,iorder] = np.polyval(coef,x)
+            elif len(gd) > 1:
+                cont[:,iorder] = np.median(flux[gd,iorder])
     else :
             gd=np.where(~mask & np.isfinite(flux))[0]
             if len(gd) > order :
                 coef = np.polyfit(x[gd],flux[gd],order)
                 cont = np.polyval(coef,x)
+            elif len(gd) > 1:
+                cont[:] = np.median(flux[gd])
+
     return cont
