@@ -203,6 +203,7 @@ def apvisit(filename,badval=20735):
         else:
             spec.observatory = 'lco'
         spec.wavevac = True
+        
         return spec
 
 

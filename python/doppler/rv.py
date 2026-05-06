@@ -1908,7 +1908,8 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
     dt = np.dtype([('filename',np.str,300),('snr',float),('vhelio',float),('vrel',float),('vrelerr',float),
                    ('teff',float),('tefferr',float),('logg',float),('loggerr',float),('feh',float),
                    ('feherr',float),('chisq',float),('bc',float),('x_ccf',(float,nlag)),('ccf',(float,nlag)),
-                   ('ccferr',(float,nlag)),('xcorr_vrel',float),('xcorr_vrelerr',float),('xcorr_vhelio',float)])
+                   ('ccferr',(float,nlag)),('xcorr_vrel',float),('xcorr_vrelerr',float),('xcorr_vhelio',float),
+                   ('ccpfwhm',float),('autofwhm',float),('autoccf',(float,nlag))])
     info = np.zeros(nspec,dtype=dt)
     for n in dt.names: info[n] = np.nan
     for i,s in enumerate(speclist):
@@ -2033,7 +2034,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
 
         pars1 = [info['teff'][0], info['logg'][0], info['feh'][0]]
         vr1 = info['vrel'][0]
-        outstr = final_xcorr(specmlist[0],modlist[0],pars1,vr1,maxvel=maxvel,plot=plot)
+        outstr,model_outstr = final_xcorr(specmlist[0],modlist[0],pars1,vr1,maxvel=maxvel,plot=plot)
         m = modlist[0](pars1,rv=vr1)
         cont = polynorm(m.flux,specmlist[0].mask)
         m.flux /= cont
@@ -2048,6 +2049,9 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         final['xcorr_vrel'][0] = rv+vr1
         final['xcorr_vrelerr'][0] = outstr['vrelerr']
         final['xcorr_vhelio'][0] = rv+vr1+info['bc'][i]
+        final['ccpfwhm'][0] = outstr['ccpfwhm']
+        final['autoccf'][0][0:nlag] = model_outstr['ccf']
+        final['autofwhm'][0] = model_outstr['ccpfwhm']
         return sumstr, final, [m], specmlist, time.time()-t0
 
         
@@ -2190,7 +2194,7 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
         
         # Final cross-correlation
         try:
-            outstr = final_xcorr(sp,modlist[i],pars1,vr1,maxvel=maxvel,plot=plot)
+            outstr,model_outstr = final_xcorr(sp,modlist[i],pars1,vr1,maxvel=maxvel,plot=plot)
             if usepeak : rv=outstr['vrel0']
             else : rv=outstr['vrel']
             if plot : pdb.set_trace()
@@ -2202,8 +2206,13 @@ def jointfit(speclist,models=None,mcmc=False,snrcut=10.0,saveplot=False,verbose=
             final['xcorr_vrel'][i] = rv+vr1
             final['xcorr_vrelerr'][i] = outstr['vrelerr']
             final['xcorr_vhelio'][i] = rv+vr1+info['bc'][i]
+            final['ccpfwhm'][i] = outstr['ccpfwhm']
+            final['autoccf'][i][0:nlag] = model_outstr['ccf']
+            final['autofwhm'][i] = model_outstr['ccpfwhm']
         except:
             if verbose: logger.info('Final cross-correlation failed for Spectrum {:d}'.format(i+1))
+            #traceback.print_exc()
+            #import pdb; pdb.set_trace()
             
     totchisq = np.sqrt(totchisq/totnpix)
     
@@ -2242,7 +2251,8 @@ def final_xcorr(sp,model,pars,rv,maxvel=[-500,500],plot=False) :
     if ((nlag % 2) == 0): nlag +=1  # make sure nlag is odd
     outstr = specxcorr(m.wave,m.flux,obs.flux,obs.err,maxlag,plot=plot)
     outstr['ccvlag'] = rv+(maxlag[0]+np.arange(nlag))*dwlog*cspeed*np.log(10)
-    return outstr
+    auto_outstr = specxcorr(m.wave,m.flux,m.flux,obs.err,maxlag,plot=plot)
+    return outstr,auto_outstr
 
 def polynorm(flux,mask,order=4) :
     """ simple polynomial continuum
